@@ -3,6 +3,7 @@
 import axios from "axios";
 import {
   CheckCircle2,
+  Eye,
   Loader2,
   Pencil,
   Plus,
@@ -67,6 +68,8 @@ type RoomCategory = {
   recommendedRank?: number;
   available?: boolean;
   availableRoomCount?: number;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 const emptyForm: RoomCategoryFormState = {
@@ -130,6 +133,24 @@ function extractCategories(payload: unknown): RoomCategory[] {
   }
 
   return [];
+}
+
+function extractCategory(payload: unknown): RoomCategory | null {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return null;
+  }
+
+  const value = payload as Record<string, unknown>;
+  const candidate = value.data ?? value.roomCategory ?? value.result ?? value;
+  if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) {
+    return null;
+  }
+
+  const nested = candidate as Record<string, unknown>;
+  const category = nested.roomCategory ?? nested.result ?? candidate;
+  return category && typeof category === "object" && !Array.isArray(category)
+    ? (category as RoomCategory)
+    : null;
 }
 
 function getErrorMessage(error: unknown) {
@@ -240,6 +261,39 @@ function StatusPill({
   );
 }
 
+function DetailItem({
+  label,
+  children,
+  className = "",
+}: {
+  label: string;
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div className={`rounded-lg border bg-muted/20 p-3 ${className}`}>
+      <dt className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
+        {label}
+      </dt>
+      <dd className="mt-1 text-sm break-words">{children || "—"}</dd>
+    </div>
+  );
+}
+
+function YesNo({ value }: { value?: boolean }) {
+  return value ? "Yes" : "No";
+}
+
+function formatDate(value?: string) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-GB", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
 export default function RoomCategoryView() {
   const [categories, setCategories] = useState<RoomCategory[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,6 +303,12 @@ export default function RoomCategoryView() {
   const [search, setSearch] = useState("");
   const [formOpen, setFormOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [detailsLoading, setDetailsLoading] = useState(false);
+  const [detailsError, setDetailsError] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState<RoomCategory | null>(
+    null,
+  );
   const [editingCategory, setEditingCategory] = useState<RoomCategory | null>(
     null,
   );
@@ -303,6 +363,30 @@ export default function RoomCategoryView() {
     setForm(categoryToForm(category));
     setError("");
     setFormOpen(true);
+  }
+
+  async function openDetailsDialog(category: RoomCategory) {
+    const id = getCategoryId(category);
+    setSelectedCategory(null);
+    setDetailsError("");
+    setDetailsOpen(true);
+
+    if (!id) {
+      setDetailsError("This category has no valid ID.");
+      return;
+    }
+
+    setDetailsLoading(true);
+    try {
+      const response = await api.get(`/room-categories/${id}`);
+      const details = extractCategory(response.data);
+      if (!details) throw new Error("The category details could not be read.");
+      setSelectedCategory(details);
+    } catch (requestError) {
+      setDetailsError(getErrorMessage(requestError));
+    } finally {
+      setDetailsLoading(false);
+    }
   }
 
   async function submitForm(event: React.FormEvent<HTMLFormElement>) {
@@ -486,6 +570,14 @@ export default function RoomCategoryView() {
                         <Button
                           variant="ghost"
                           size="icon-sm"
+                          aria-label={`View ${category.name}`}
+                          onClick={() => void openDetailsDialog(category)}
+                        >
+                          <Eye />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon-sm"
                           aria-label={`Edit ${category.name}`}
                           onClick={() => openEditDialog(category)}
                         >
@@ -520,6 +612,153 @@ export default function RoomCategoryView() {
         saving={saving}
         error={error}
       />
+      <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
+          <DialogHeader className="pr-8">
+            <DialogTitle>Room category details</DialogTitle>
+            <DialogDescription>
+              Complete room-category information from the server.
+            </DialogDescription>
+          </DialogHeader>
+
+          {detailsLoading ? (
+            <div className="flex min-h-48 items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-5 animate-spin" />
+              Loading category details...
+            </div>
+          ) : detailsError ? (
+            <div className="rounded-lg border border-destructive/20 bg-destructive/10 p-3 text-sm text-destructive">
+              {detailsError}
+            </div>
+          ) : selectedCategory ? (
+            <dl className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              <DetailItem label="Name" className="sm:col-span-2">
+                {selectedCategory.name}
+              </DetailItem>
+              <DetailItem label="Slug">{selectedCategory.slug}</DetailItem>
+              <DetailItem label="Bed type">
+                {selectedCategory.bedType}
+              </DetailItem>
+              <DetailItem label="Room size">
+                {selectedCategory.roomSize}
+              </DetailItem>
+              <DetailItem label="View">{selectedCategory.view}</DetailItem>
+              <DetailItem label="Maximum guests">
+                {selectedCategory.maxGuests}
+              </DetailItem>
+              <DetailItem label="Rent">
+                {selectedCategory.rent === undefined
+                  ? "—"
+                  : `${selectedCategory.currency ?? "BDT"} ${selectedCategory.rent.toLocaleString()}`}
+              </DetailItem>
+              <DetailItem label="Discount">
+                {selectedCategory.discountPercent === undefined
+                  ? "—"
+                  : `${selectedCategory.discountPercent}%`}
+              </DetailItem>
+              <DetailItem label="Available rooms">
+                {selectedCategory.availableRoomCount}
+              </DetailItem>
+              <DetailItem label="Available">
+                <YesNo value={selectedCategory.available} />
+              </DetailItem>
+              <DetailItem label="Website visible">
+                <YesNo value={selectedCategory.showOnWebsite} />
+              </DetailItem>
+              <DetailItem label="Featured">
+                <YesNo value={selectedCategory.featured} />
+              </DetailItem>
+              <DetailItem label="Mini fridge">
+                <YesNo value={selectedCategory.hasMiniFridge} />
+              </DetailItem>
+              <DetailItem label="Geyser">
+                <YesNo value={selectedCategory.hasGeyser} />
+              </DetailItem>
+              <DetailItem label="Balcony">
+                <YesNo value={selectedCategory.hasBalcony} />
+              </DetailItem>
+              <DetailItem label="Popularity rank">
+                {selectedCategory.popularityRank}
+              </DetailItem>
+              <DetailItem label="Recommended rank">
+                {selectedCategory.recommendedRank}
+              </DetailItem>
+              <DetailItem label="Amenities" className="sm:col-span-2">
+                {selectedCategory.amenities?.length
+                  ? selectedCategory.amenities.join(", ")
+                  : "—"}
+              </DetailItem>
+              <DetailItem
+                label="Short description"
+                className="sm:col-span-2 lg:col-span-3"
+              >
+                <span className="whitespace-pre-wrap">
+                  {selectedCategory.shortDescription || "—"}
+                </span>
+              </DetailItem>
+              <DetailItem
+                label="Description"
+                className="sm:col-span-2 lg:col-span-3"
+              >
+                <span className="whitespace-pre-wrap">
+                  {selectedCategory.description || "—"}
+                </span>
+              </DetailItem>
+              <DetailItem
+                label="Cover image"
+                className="sm:col-span-2 lg:col-span-3"
+              >
+                {selectedCategory.image ? (
+                  <a
+                    className="text-primary hover:underline"
+                    href={selectedCategory.image}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    {selectedCategory.image}
+                  </a>
+                ) : (
+                  "—"
+                )}
+              </DetailItem>
+              <DetailItem
+                label="Gallery images"
+                className="sm:col-span-2 lg:col-span-3"
+              >
+                {selectedCategory.images?.length ? (
+                  <ul className="space-y-1">
+                    {selectedCategory.images.map((image, index) => (
+                      <li key={image}>
+                        <a
+                          className="text-primary hover:underline"
+                          href={image}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Image {index + 1}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  "—"
+                )}
+              </DetailItem>
+              <DetailItem label="Created">
+                {formatDate(selectedCategory.createdAt)}
+              </DetailItem>
+              <DetailItem label="Last updated">
+                {formatDate(selectedCategory.updatedAt)}
+              </DetailItem>
+              <DetailItem label="Category ID">
+                <span className="font-mono text-xs">
+                  {getCategoryId(selectedCategory)}
+                </span>
+              </DetailItem>
+            </dl>
+          ) : null}
+        </DialogContent>
+      </Dialog>
       <Dialog open={deleteOpen} onOpenChange={setDeleteOpen}>
         <DialogContent>
           <DialogHeader className="pr-8">
