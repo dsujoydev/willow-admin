@@ -6,8 +6,8 @@ import { useId, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import api from "@/lib/api";
 
-const IMAGE_UPLOAD_URL = "http://localhost:3005/api/images";
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
 
@@ -78,7 +78,7 @@ async function uploadImage(file: File) {
   const formData = new FormData();
   formData.append("image", file);
 
-  const response = await axios.post(IMAGE_UPLOAD_URL, formData);
+  const response = await api.post("/images", formData);
   const url = getUploadUrl(response.data);
   if (!url) throw new Error("The upload response did not include an image URL.");
   return url;

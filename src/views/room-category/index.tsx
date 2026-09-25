@@ -36,11 +36,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-const api = axios.create({
-  baseURL: "http://localhost:3005/api",
-  headers: { "Content-Type": "application/json" },
-});
+import api from "@/lib/api";
 
 type RoomCategory = {
   _id?: string;
