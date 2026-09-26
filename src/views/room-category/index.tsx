@@ -52,6 +52,8 @@ type RoomCategory = {
   hasGeyser?: boolean;
   hasBalcony?: boolean;
   maxGuests?: number;
+  maxAdults?: number;
+  maxChildren?: number;
   amenities?: string[];
   rent?: number;
   currency?: string;
@@ -80,6 +82,8 @@ const emptyForm: RoomCategoryFormState = {
   hasGeyser: false,
   hasBalcony: false,
   maxGuests: "",
+  maxAdults: "",
+  maxChildren: "",
   amenities: "",
   rent: "",
   currency: "BDT",
@@ -97,6 +101,8 @@ const emptyForm: RoomCategoryFormState = {
 const numberFields = [
   "roomSize",
   "maxGuests",
+  "maxAdults",
+  "maxChildren",
   "rent",
   "discountPercent",
   "popularityRank",
@@ -175,6 +181,8 @@ function categoryToForm(category: RoomCategory): RoomCategoryFormState {
     hasGeyser: Boolean(category.hasGeyser),
     hasBalcony: Boolean(category.hasBalcony),
     maxGuests: asText(category.maxGuests),
+    maxAdults: asText(category.maxAdults),
+    maxChildren: asText(category.maxChildren),
     amenities: category.amenities?.join(", ") ?? "",
     rent: asText(category.rent),
     currency: category.currency ?? "BDT",
@@ -500,7 +508,7 @@ export default function RoomCategoryView() {
               <TableRow className="bg-muted/40 hover:bg-muted/40">
                 <TableHead className="pl-4">Category</TableHead>
                 <TableHead>Bed type</TableHead>
-                <TableHead>Guests</TableHead>
+                <TableHead>Occupancy</TableHead>
                 <TableHead>Rent</TableHead>
                 <TableHead>Website</TableHead>
                 <TableHead>Availability</TableHead>
@@ -543,7 +551,14 @@ export default function RoomCategoryView() {
                       </div>
                     </TableCell>
                     <TableCell>{category.bedType || "—"}</TableCell>
-                    <TableCell>{category.maxGuests ?? "—"}</TableCell>
+                    <TableCell>
+                      <span className="block">{category.maxGuests ?? "—"} total</span>
+                      {(category.maxAdults !== undefined || category.maxChildren !== undefined) && (
+                        <span className="text-xs text-muted-foreground">
+                          {category.maxAdults ?? 0} adults · {category.maxChildren ?? 0} children
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>
                       {category.rent === undefined
                         ? "—"
@@ -641,6 +656,12 @@ export default function RoomCategoryView() {
               <DetailItem label="View">{selectedCategory.view}</DetailItem>
               <DetailItem label="Maximum guests">
                 {selectedCategory.maxGuests}
+              </DetailItem>
+              <DetailItem label="Maximum adults">
+                {selectedCategory.maxAdults}
+              </DetailItem>
+              <DetailItem label="Maximum children">
+                {selectedCategory.maxChildren}
               </DetailItem>
               <DetailItem label="Rent">
                 {selectedCategory.rent === undefined

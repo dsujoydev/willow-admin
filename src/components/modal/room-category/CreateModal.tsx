@@ -33,6 +33,8 @@ export type RoomCategoryFormState = {
   hasGeyser: boolean;
   hasBalcony: boolean;
   maxGuests: string;
+  maxAdults: string;
+  maxChildren: string;
   amenities: string;
   rent: string;
   currency: string;
@@ -219,6 +221,28 @@ export default function CreateModal({
                     value={form.maxGuests}
                     onChange={(event) => onFormChange("maxGuests", event.target.value)}
                     placeholder="2"
+                  />
+                </Field>
+                <Field label="Maximum adults" htmlFor="maxAdults">
+                  <Input
+                    id="maxAdults"
+                    type="number"
+                    min="1"
+                    step="1"
+                    value={form.maxAdults}
+                    onChange={(event) => onFormChange("maxAdults", event.target.value)}
+                    placeholder="2"
+                  />
+                </Field>
+                <Field label="Maximum children" htmlFor="maxChildren">
+                  <Input
+                    id="maxChildren"
+                    type="number"
+                    min="0"
+                    step="1"
+                    value={form.maxChildren}
+                    onChange={(event) => onFormChange("maxChildren", event.target.value)}
+                    placeholder="1"
                   />
                 </Field>
                 <div className="min-w-0 sm:col-span-2">

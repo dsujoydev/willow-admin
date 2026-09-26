@@ -1,6 +1,6 @@
 "use client";
 
-import { BedDouble, BookOpenCheck, Building2, ChevronRight, ClipboardList, Loader2, LogOut } from "lucide-react";
+import { BedDouble, BookOpenCheck, Building2, ChevronRight, ClipboardList, Images, Loader2, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect } from "react";
@@ -30,6 +30,7 @@ const navigation = [
   { label: "Room categories", href: "/room-category", icon: BedDouble },
   { label: "Rooms", href: "/room", icon: Building2 },
   { label: "Bookings", href: "/bookings", icon: BookOpenCheck },
+  { label: "Site media", href: "/site-media", icon: Images },
 ];
 
 function titleForPath(pathname: string) {

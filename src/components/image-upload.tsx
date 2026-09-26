@@ -9,12 +9,19 @@ import { Input } from "@/components/ui/input";
 import api from "@/lib/api";
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const ACCEPTED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif"];
+const ACCEPTED_IMAGE_TYPES = [
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/gif",
+  "image/avif",
+];
 
 type ImageUploadProps = {
   id?: string;
   value: string;
   onChange: (value: string) => void;
+  uploadFile?: (file: File) => Promise<string>;
   disabled?: boolean;
   onUploadingChange?: (uploading: boolean) => void;
 };
@@ -23,6 +30,7 @@ type MultiImageUploadProps = {
   id?: string;
   values: string[];
   onChange: (values: string[]) => void;
+  uploadFile?: (file: File) => Promise<string>;
   disabled?: boolean;
   onUploadingChange?: (uploading: boolean) => void;
 };
@@ -58,7 +66,9 @@ function getUploadUrl(payload: unknown): string | null {
 
 function getUploadError(error: unknown) {
   if (axios.isAxiosError(error)) {
-    const data = error.response?.data as { message?: string; error?: string } | undefined;
+    const data = error.response?.data as
+      | { message?: string; error?: string }
+      | undefined;
     return data?.message ?? data?.error ?? error.message;
   }
   return error instanceof Error ? error.message : "Image upload failed.";
@@ -80,7 +90,8 @@ async function uploadImage(file: File) {
 
   const response = await api.post("/images", formData);
   const url = getUploadUrl(response.data);
-  if (!url) throw new Error("The upload response did not include an image URL.");
+  if (!url)
+    throw new Error("The upload response did not include an image URL.");
   return url;
 }
 
@@ -97,7 +108,14 @@ function Preview({ src, label }: { src: string; label: string }) {
 
 // Compact single-image (cover) uploader: a small square thumbnail with
 // inline action buttons, instead of a full-width aspect-video block.
-export function ImageUpload({ id, value, onChange, disabled, onUploadingChange }: ImageUploadProps) {
+export function ImageUpload({
+  id,
+  value,
+  onChange,
+  uploadFile: upload,
+  disabled,
+  onUploadingChange,
+}: ImageUploadProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -120,7 +138,7 @@ export function ImageUpload({ id, value, onChange, disabled, onUploadingChange }
     onUploadingChange?.(true);
 
     try {
-      onChange(await uploadImage(file));
+      onChange(await (upload ?? uploadImage)(file));
     } catch (uploadError) {
       setError(getUploadError(uploadError));
     } finally {
@@ -163,12 +181,18 @@ export function ImageUpload({ id, value, onChange, disabled, onUploadingChange }
             onClick={() => inputRef.current?.click()}
             disabled={disabled || uploading}
           >
-            {uploading ? <Loader2 className="size-5 animate-spin" /> : <ImageIcon className="size-5" />}
+            {uploading ? (
+              <Loader2 className="size-5 animate-spin" />
+            ) : (
+              <ImageIcon className="size-5" />
+            )}
           </button>
         )}
 
         <div className="flex min-w-0 flex-col gap-1.5">
-          <span className="text-xs text-muted-foreground">PNG, JPG, WebP, GIF or AVIF · max 5 MB</span>
+          <span className="text-xs text-muted-foreground">
+            PNG, JPG, WebP, GIF or AVIF · max 5 MB
+          </span>
           <div className="flex gap-2">
             <Button
               type="button"
@@ -203,7 +227,14 @@ export function ImageUpload({ id, value, onChange, disabled, onUploadingChange }
 
 // Compact multi-image (gallery) uploader: small fixed-size tiles that wrap,
 // instead of a wide responsive grid, so the modal stays narrow.
-export function MultiImageUpload({ id, values, onChange, disabled, onUploadingChange }: MultiImageUploadProps) {
+export function MultiImageUpload({
+  id,
+  values,
+  onChange,
+  uploadFile: upload,
+  disabled,
+  onUploadingChange,
+}: MultiImageUploadProps) {
   const generatedId = useId();
   const inputId = id ?? generatedId;
   const inputRef = useRef<HTMLInputElement>(null);
@@ -215,7 +246,9 @@ export function MultiImageUpload({ id, values, onChange, disabled, onUploadingCh
     const files = Array.from(selectedFiles ?? []);
     if (!files.length) return;
 
-    const validationErrors = files.map(validateFile).filter(Boolean) as string[];
+    const validationErrors = files
+      .map(validateFile)
+      .filter(Boolean) as string[];
     if (validationErrors.length) {
       setError(validationErrors.join(" "));
       if (inputRef.current) inputRef.current.value = "";
@@ -230,8 +263,12 @@ export function MultiImageUpload({ id, values, onChange, disabled, onUploadingCh
     setError("");
     onUploadingChange?.(true);
 
-    const results = await Promise.allSettled(files.map(uploadImage));
-    const uploadedUrls = results.flatMap((result) => (result.status === "fulfilled" ? [result.value] : []));
+    const results = await Promise.allSettled(
+      files.map((file) => (upload ?? uploadImage)(file)),
+    );
+    const uploadedUrls = results.flatMap((result) =>
+      result.status === "fulfilled" ? [result.value] : [],
+    );
     const failed = results.filter((result) => result.status === "rejected");
 
     if (uploadedUrls.length) {
@@ -269,7 +306,10 @@ export function MultiImageUpload({ id, values, onChange, disabled, onUploadingCh
 
       <div className="flex min-w-0 flex-wrap gap-2">
         {values.map((imageUrl, index) => (
-          <div key={imageUrl} className="group relative size-20 shrink-0 overflow-hidden rounded-lg border bg-muted">
+          <div
+            key={imageUrl}
+            className="group relative size-20 shrink-0 overflow-hidden rounded-lg border bg-muted"
+          >
             <Preview src={imageUrl} label={`Gallery image ${index + 1}`} />
             <Button
               type="button"
@@ -286,8 +326,14 @@ export function MultiImageUpload({ id, values, onChange, disabled, onUploadingCh
         ))}
 
         {pending.map((image, index) => (
-          <div key={image.id} className="relative size-20 shrink-0 overflow-hidden rounded-lg border bg-muted">
-            <Preview src={image.previewUrl} label={`Uploading image ${index + 1}`} />
+          <div
+            key={image.id}
+            className="relative size-20 shrink-0 overflow-hidden rounded-lg border bg-muted"
+          >
+            <Preview
+              src={image.previewUrl}
+              label={`Uploading image ${index + 1}`}
+            />
             <div className="absolute inset-0 grid place-items-center bg-black/45 text-white">
               <Loader2 className="size-4 animate-spin" />
             </div>
@@ -300,12 +346,20 @@ export function MultiImageUpload({ id, values, onChange, disabled, onUploadingCh
           onClick={() => inputRef.current?.click()}
           disabled={disabled || uploading}
         >
-          {uploading ? <Loader2 className="size-4 animate-spin" /> : <Upload className="size-4" />}
-          <span className="font-medium text-foreground">{values.length ? "Add more" : "Upload"}</span>
+          {uploading ? (
+            <Loader2 className="size-4 animate-spin" />
+          ) : (
+            <Upload className="size-4" />
+          )}
+          <span className="font-medium text-foreground">
+            {values.length ? "Add more" : "Upload"}
+          </span>
         </button>
       </div>
 
-      <p className="text-xs text-muted-foreground">PNG, JPG, WebP, GIF or AVIF · max 5 MB each.</p>
+      <p className="text-xs text-muted-foreground">
+        PNG, JPG, WebP, GIF or AVIF · max 5 MB each.
+      </p>
       {error && <p className="text-xs text-destructive">{error}</p>}
     </div>
   );
